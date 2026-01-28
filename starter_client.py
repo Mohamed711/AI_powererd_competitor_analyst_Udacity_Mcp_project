@@ -96,8 +96,12 @@ class Server:
         if command is None:
             raise ValueError("The command must be a valid string and cannot be None.")
 
-        # complete params
-        server_params = StdioServerParameters()
+        server_params = StdioServerParameters(
+            command=command,
+            args=self.config["args"],
+            env={**os.environ,** self.config["env"]} if self.config.get("env") else None,
+        )
+
         try:
             stdio_transport = await self.exit_stack.enter_async_context(stdio_client(server_params))
             read, write = stdio_transport
@@ -119,7 +123,22 @@ class Server:
         Raises:
             RuntimeError: If the server is not initialized.
         """
-        # complete
+        if self.session is None:
+            raise RuntimeError(f"Server {self.name} is not initialized.")
+
+        tools_response = await self.session.list_tools()
+        logging.info(f"✓ Retrieved {len(tools_response)} tools from server '{self.name}'")
+
+        tools = []
+        for tool in tools_response:
+            tool_def: ToolDefinition = {
+                "name": tool.name,
+                "description": tool.description,
+                "input_schema": tool.inputSchema
+            }
+            tools.append(tool_def)
+
+        return tools
 
     async def execute_tool(
         self,
