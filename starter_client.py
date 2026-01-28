@@ -162,7 +162,26 @@ class Server:
             RuntimeError: If server is not initialized.
             Exception: If tool execution fails after all retries.
         """
-        # complete
+        if self.session is None:
+            raise RuntimeError(f"Server {self.name} is not initialized.")
+
+        attempt = 0
+        while attempt <= retries:
+            try:
+                result = await self.session.call_tool(name=tool_name, arguments=arguments, read_timeout_seconds=timedelta(seconds=60))
+                logging.info(f"✓ Tool '{tool_name}' executed successfully on server '{self.name}'")
+                return result
+
+            except Exception as e:
+                logging.error(f"Error executing tool '{tool_name}' on server '{self.name}': {e}")
+
+                attempt += 1
+                if attempt > retries:
+                    logging.error(f"Failed to execute tool '{tool_name}' after {retries} retries.")
+                    raise Exception(f"Tool '{tool_name}' execution failed after {retries} retries.")
+
+                logging.info(f"Retrying tool '{tool_name}' in {delay} seconds... (Attempt {attempt}/{retries})")
+                await asyncio.sleep(delay)
 
     async def cleanup(self) -> None:
         """Clean up server resources."""
