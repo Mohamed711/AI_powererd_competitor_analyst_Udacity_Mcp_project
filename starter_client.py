@@ -57,7 +57,7 @@ class Configuration:
         except FileNotFoundError:
             raise FileNotFoundError(f"Configuration file not found: {file_path}")
         except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON in configuration file: {e}")
+            raise json.JSONDecodeError(f"Invalid JSON in configuration file: {e}")
 
         if "mcpServers" not in config:
             raise ValueError("Configuration file missing 'mcpServers' field")
@@ -127,16 +127,17 @@ class Server:
             raise RuntimeError(f"Server {self.name} is not initialized.")
 
         tools_response = await self.session.list_tools()
-        logging.info(f"✓ Retrieved {len(tools_response)} tools from server '{self.name}'")
 
         tools = []
-        for tool in tools_response:
-            tool_def: ToolDefinition = {
-                "name": tool.name,
-                "description": tool.description,
-                "input_schema": tool.inputSchema
-            }
-            tools.append(tool_def)
+        for item in tools_response:
+            if isinstance(item, tuple) and item[0] == "tools":
+                for tool in item[1]:
+                    tool_def: ToolDefinition = {
+                        "name": tool.name,
+                        "description": tool.description,
+                        "input_schema": tool.inputSchema
+                    }
+                    tools.append(tool_def)
 
         return tools
 
@@ -309,7 +310,7 @@ class ChatSession:
 
     def __init__(self, servers: list[Server], api_key: str) -> None:
         self.servers: list[Server] = servers
-        self.anthropic = Anthropic(api_key=api_key)
+        self.anthropic = Anthropic(base_url="https://claude.vocareum.com", api_key=api_key)
         self.available_tools: List[ToolDefinition] = []
         self.tool_to_server: Dict[str, str] = {}
         self.sqlite_server: Server | None = None
@@ -328,7 +329,7 @@ class ChatSession:
         messages = [{'role': 'user', 'content': query}]
         response = self.anthropic.messages.create(
             max_tokens=2024,
-            model='claude-3-5-sonnet-20240620',
+            model="claude-sonnet-4-5-20250929",
             tools=self.available_tools,
             messages=messages
         )
@@ -351,9 +352,9 @@ class ChatSession:
                 elif content.type == 'tool_use':
                     assistant_content.append(content)
                     messages.append({'role': 'assistant', 'content': content})
-                    tool_name = content.tool_name
-                    tool_args = content.tool_arguments
-                    tool_id = content.tool_id
+                    tool_name = content.name
+                    tool_args = content.input
+                    tool_id = content.id
 
                     # Find the server for the tool
                     server_name = self.tool_to_server.get(tool_name)
@@ -373,7 +374,7 @@ class ChatSession:
                     # Call Claude again with updated messages
                     response = self.anthropic.messages.create(
                         max_tokens=2024,
-                        model='claude-3-5-sonnet-20240620',
+                        model="claude-sonnet-4-5-20250929",
                         tools=self.available_tools,
                         messages=messages
                     )
