@@ -88,19 +88,19 @@ def scrape_websites(
         logger.info(f"Scraping {provider_name} at {url}")
 
         try:
-            scrape_result = app.scrape(url=url, formats=formats)
+            scrape_result = app.scrape(url=url, formats=formats).model_dump()
 
             # Raise an exception if the scrape was not successful
-            if scrape_result.get("success", False) is False:
+            if scrape_result.get("metadata", {}).get("status_code", 0) != 200:
                 raise ValueError(f"Scrape failed for {provider_name} at {url} \
                                   with error: {scrape_result.get("data", {}).get("metadata", {}).get('error', 'Unknown error')}")
 
             # Read the result data
-            scrape_result_data = scrape_result.get("data", {})
+            scrape_result_data = scrape_result.get("metadata", {})
 
             content_files = {}
             for fmt in formats:
-                content = scrape_result_data.get(fmt, None)
+                content = scrape_result.get(fmt, None)
                 if content:
                     filename = f"{provider_name}_{fmt}.txt"
                     filepath = os.path.join(path, filename)
@@ -201,4 +201,15 @@ def extract_scraped_info(identifier: str) -> str:
 
 
 if __name__ == "__main__":
+    # result = mcp.call_tool(name="scrape_websites", arguments={"websites":{"claudrift":"https://www.cloudrift.ai/inference"}})
     mcp.run(transport="stdio")
+
+    # For testing: uncomment the lines below and comment out mcp.run() above
+    # result_ = scrape_websites(
+    #     websites={"cloudrift": "https://www.cloudrift.ai/inference"},
+    #     formats=['markdown', 'html']
+    # )
+    # print(f"Scrape result: {result_}")
+    #
+    # info = extract_scraped_info("cloudrift")
+    # print(f"Extracted info: {info}")
