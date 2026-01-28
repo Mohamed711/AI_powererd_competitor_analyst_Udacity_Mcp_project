@@ -51,7 +51,18 @@ class Configuration:
             JSONDecodeError: If configuration file is invalid JSON.
             ValueError: If configuration file is missing required fields.
         """
-        # complete
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Configuration file not found: {file_path}")
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in configuration file: {e}")
+
+        if "mcpServers" not in config:
+            raise ValueError("Configuration file missing 'mcpServers' field")
+
+        return config
 
     @property
     def anthropic_api_key(self) -> str:
