@@ -161,7 +161,44 @@ def extract_scraped_info(identifier: str) -> str:
     metadata_file = os.path.join(SCRAPE_DIR, "scraped_metadata.json")
     logger.info(f"Checking metadata file: {metadata_file}")
 
-    # contine your response here ...
+    # The result dictionary
+    result = {}
+
+    # Read the scrapped metadata
+    if not os.path.exists(metadata_file):
+        raise FileNotFoundError(f"Metadata file not found at {metadata_file}")
+
+    try:
+        with open(metadata_file, 'r', encoding='utf-8') as f:
+            scraped_metadata = json.load(f)
+    except Exception as e:
+        raise ValueError(f"Error decoding JSON from metadata file: {e}")
+
+    # Find the matching entry
+    matched_entry = None
+    for provider_name, data in scraped_metadata.items():
+        if identifier == provider_name or identifier == data.get("url") or identifier == data.get("domain"):
+            matched_entry = data.copy()
+            break
+
+    if matched_entry is None:
+        return f"There's no saved information related to identifier '{identifier}'."
+
+    if matched_entry.get("content_files"):
+        result["content"] = dict()
+
+        for fmt, filename in matched_entry["content_files"].items():
+            filepath = os.path.join(SCRAPE_DIR, filename)
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                result["content"][fmt] = content
+            except Exception as e:
+                logger.error(f"Error reading content file {filepath}: {e}")
+                return f"There's no saved information related to identifier '{identifier}'."
+
+    return json.dumps(result, indent=2)
+
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")
