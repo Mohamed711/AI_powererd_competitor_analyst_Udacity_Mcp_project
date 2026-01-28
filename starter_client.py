@@ -282,8 +282,21 @@ class DataExtractor:
             pricing_data = json.loads(extraction_response)
 
             for plan in pricing_data.get("plans", []):
-                pass
-                # complete
+                await self.sqlite_server.execute_tool("write_query", {
+                    "query": f"""
+                    INSERT INTO pricing_plans (company_name, plan_name, input_tokens, output_tokens, currency, billing_period, features, limitations, source_query)
+                    VALUES (
+                        '{pricing_data.get("company_name", "Unknown")}',
+                        '{plan.get("plan_name", "Unknown Plan")}',
+                        '{plan.get("input_tokens", 0)}',
+                        '{plan.get("output_tokens", 0)}',
+                        '{plan.get("currency", "USD")}',
+                        '{plan.get("billing_period", "unknown")}',
+                        '{json.dumps(plan.get("features", []))}',
+                        '{plan.get("limitations", "")}',
+                        '{user_query}')
+                    """
+                })
 
             logger.info(f"Stored {len(pricing_data.get('plans', []))} pricing plans")
 
