@@ -31,26 +31,26 @@ def scrape_websites(
 ) -> List[str]:
     """
     Scrape multiple websites using Firecrawl and store their content.
-    
+
     Args:
         websites: Dictionary of provider_name -> URL mappings
         formats: List of formats to scrape ['markdown', 'html'] (default: both)
         api_key: Firecrawl API key (if None, expects environment variable)
-        
+
     Returns:
         List of provider names for successfully scraped websites
     """
-    
+
     if api_key is None:
         api_key = os.getenv('FIRECRAWL_API_KEY')
         if not api_key:
             raise ValueError("API key must be provided or set as FIRECRAWL_API_KEY environment variable")
-    
+
     app = FirecrawlApp(api_key=api_key)
-    
+
     path = os.path.join(SCRAPE_DIR)
     os.makedirs(path, exist_ok=True)
-    
+
     # save the scraped content to files and then create scraped_metadata.json as a summary file
     # check if the provider has already been scraped and decide if you want to overwrite
     # {
@@ -74,20 +74,87 @@ def scrape_websites(
     # }
     metadata_file = os.path.join(path, "scraped_metadata.json")
 
-    # continue your solution here ...
+    # Read the scrapped metadata if it exists
+    if os.path.exists(metadata_file):
+        with open(metadata_file, 'r', encoding='utf-8') as f:
+            scraped_metadata = json.load(f)
+    else:
+        scraped_metadata = {}
+
+    successful_scrapes = []
+
+    # Scrap the provided websites
+    for provider_name, url in websites.items():
+        logger.info(f"Scraping {provider_name} at {url}")
+
+        try:
+            scrape_result = app.scrape(url=url, formats=formats)
+
+            # Raise an exception if the scrape was not successful
+            if scrape_result.get("success", False) is False:
+                raise ValueError(f"Scrape failed for {provider_name} at {url} \
+                                  with error: {scrape_result.get("data", {}).get("metadata", {}).get('error', 'Unknown error')}")
+
+            # Read the result data
+            scrape_result_data = scrape_result.get("data", {})
+
+            content_files = {}
+            for fmt in formats:
+                content = scrape_result_data.get(fmt, None)
+                if content:
+                    filename = f"{provider_name}_{fmt}.txt"
+                    filepath = os.path.join(path, filename)
+                    with open(filepath, 'w', encoding='utf-8') as f:
+                        f.write(content)
+                    content_files[fmt] = filename
+
+            scraped_metadata[provider_name] = {
+                "provider_name": provider_name,
+                "url": url,
+                "domain": urlparse(url).netloc,
+                "scraped_at": datetime.utcnow().isoformat(),
+                "formats": formats,
+                "success": True,
+                "content_files": content_files,
+                "title": scrape_result_data.get("metadata", {}).get("title", ""),
+                "description": scrape_result_data.get("metadata", {}).get("description", "")
+            }
+
+            successful_scrapes.append(provider_name)
+            logger.info(f"Successfully scraped {provider_name}")
+
+        except Exception as e:
+            logger.error(f"Failed to scrape {provider_name} at {url}: {e}")
+            scraped_metadata[provider_name] = {
+                "provider_name": provider_name,
+                "url": url,
+                "domain": urlparse(url).netloc,
+                "scraped_at": datetime.utcnow().isoformat(),
+                "formats": formats,
+                "success": False,
+                "error": str(e)
+            }
+
+
+    # Write the updated metadata back to the file
+    with open(metadata_file, 'w', encoding='utf-8') as f:
+        json.dump(scraped_metadata, f, indent=4)
+
+    logger.info(f"Scraping completed. Successful scrapes: {successful_scrapes}")
+    return successful_scrapes
 
 @mcp.tool()
 def extract_scraped_info(identifier: str) -> str:
     """
     Extract information about a scraped website.
-    
+
     Args:
         identifier: The provider name, full URL, or domain to look for
-        
+
     Returns:
         Formatted JSON string with the scraped information
     """
-    
+
     logger.info(f"Extracting information for identifier: {identifier}")
     logger.info(f"Files in {SCRAPE_DIR}: {os.listdir(SCRAPE_DIR)}")
 
