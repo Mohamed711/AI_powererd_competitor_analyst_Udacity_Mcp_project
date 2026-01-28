@@ -341,17 +341,16 @@ class ChatSession:
         process_query = True
         while process_query:
             assistant_content = []
+            tool_results = []
+
+            # Collect all content blocks from Claude's response
             for content in response.content:
                 if content.type == 'text':
                     full_response += content.text + "\n"
                     assistant_content.append(content)
 
-                    if len(response.content) == 1:
-                        process_query = False
-
                 elif content.type == 'tool_use':
                     assistant_content.append(content)
-                    messages.append({'role': 'assistant', 'content': content})
                     tool_name = content.name
                     tool_args = content.input
                     tool_id = content.id
@@ -367,24 +366,44 @@ class ChatSession:
                         raise ValueError(f"Server '{server_name}' not found for tool '{tool_name}'.")
                     tool_result = await server.execute_tool(tool_name, tool_args)
 
-                    # Append tool result to messages
-                    tool_result_content = {'type': 'tool_result', 'tool_id': tool_id, 'result': tool_result}
-                    messages.append({'role': 'tool', 'content': tool_result_content})
+                    # Extract content from CallToolResult
+                    result_content = []
+                    for content_item in tool_result.content:
+                        if hasattr(content_item, 'text'):
+                            result_content.append({'type': 'text', 'text': content_item.text})
+                        else:
+                            result_content.append(content_item)
 
-                    # Call Claude again with updated messages
-                    response = self.anthropic.messages.create(
-                        max_tokens=2024,
-                        model="claude-sonnet-4-5-20250929",
-                        tools=self.available_tools,
-                        messages=messages
-                    )
+                    # Collect tool result
+                    tool_results.append({
+                        'type': 'tool_result',
+                        'tool_use_id': tool_id,
+                        'content': result_content
+                    })
 
-                    # Check the final response is a text response
-                    if type(response.content) is str:
-                        full_response += response.content + "\n"
-                        process_query = False
+            # Append assistant message with all content blocks
+            messages.append({
+                'role': 'assistant',
+                'content': assistant_content
+            })
 
+            # If there are tool results, append them and continue the loop
+            if tool_results:
+                messages.append({
+                    'role': 'user',
+                    'content': tool_results
+                })
 
+                # Call Claude again with updated messages
+                response = self.anthropic.messages.create(
+                    max_tokens=2024,
+                    model="claude-sonnet-4-5-20250929",
+                    tools=self.available_tools,
+                    messages=messages
+                )
+            else:
+                # No tools used, end the loop
+                process_query = False
 
         if self.data_extractor and full_response.strip():
             await self.data_extractor.extract_and_store_data(query, full_response.strip(), source_url)

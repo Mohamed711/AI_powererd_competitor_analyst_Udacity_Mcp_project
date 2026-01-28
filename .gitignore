@@ -1,9 +1,4 @@
 /.env
-/.idea/inspectionProfiles/profiles_settings.xml
-/.idea/.gitignore
-/.idea/misc.xml
-/.idea/modules.xml
-/.idea/Project-Starter.iml
-/.idea/vcs.xml
-/scraped_content/scraped_metadata.json
+/.idea/
 /test.db
+/scraped_content/

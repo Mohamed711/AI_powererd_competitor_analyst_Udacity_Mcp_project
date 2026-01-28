@@ -5,7 +5,7 @@ import logging
 from typing import List, Dict, Optional
 from firecrawl import FirecrawlApp
 from urllib.parse import urlparse
-from datetime import datetime
+from datetime import datetime, timezone
 from mcp.server.fastmcp import FastMCP
 
 from dotenv import load_dotenv
@@ -51,27 +51,6 @@ def scrape_websites(
     path = os.path.join(SCRAPE_DIR)
     os.makedirs(path, exist_ok=True)
 
-    # save the scraped content to files and then create scraped_metadata.json as a summary file
-    # check if the provider has already been scraped and decide if you want to overwrite
-    # {
-    #     "cloudrift_ai": {
-    #         "provider_name": "cloudrift_ai",
-    #         "url": "https://www.cloudrift.ai/inference",
-    #         "domain": "www.cloudrift.ai",
-    #         "scraped_at": "2025-10-23T00:44:59.902569",
-    #         "formats": [
-    #             "markdown",
-    #             "html"
-    #         ],
-    #         "success": "true",
-    #         "content_files": {
-    #             "markdown": "cloudrift_ai_markdown.txt",
-    #             "html": "cloudrift_ai_html.txt"
-    #         },
-    #         "title": "AI Inference",
-    #         "description": "Scraped content goes here"
-    #     }
-    # }
     metadata_file = os.path.join(path, "scraped_metadata.json")
 
     # Read the scrapped metadata if it exists
@@ -112,7 +91,7 @@ def scrape_websites(
                 "provider_name": provider_name,
                 "url": url,
                 "domain": urlparse(url).netloc,
-                "scraped_at": datetime.utcnow().isoformat(),
+                "scraped_at": datetime.now(timezone.utc).isoformat(),
                 "formats": formats,
                 "success": True,
                 "content_files": content_files,
@@ -129,7 +108,7 @@ def scrape_websites(
                 "provider_name": provider_name,
                 "url": url,
                 "domain": urlparse(url).netloc,
-                "scraped_at": datetime.utcnow().isoformat(),
+                "scraped_at": datetime.now(timezone.utc).isoformat(),
                 "formats": formats,
                 "success": False,
                 "error": str(e)
