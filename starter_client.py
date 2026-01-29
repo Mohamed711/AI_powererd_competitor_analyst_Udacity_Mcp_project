@@ -460,9 +460,19 @@ class ChatSession:
                 result_text = pricing.content[0].text
                 plans = ast.literal_eval(result_text)
                 if isinstance(plans, list):
+                    print("-" * 75)
+                    print(f"{'Company':<20} {'Plan':<25} {'Input Tokens':<15} {'Output Tokens':<15}")
+                    print("-" * 75)
+
                     for plan in plans:
-                        print(f"  • {plan.get('company_name', 'N/A')}: {plan.get('plan_name', 'N/A')} - Input Token ${plan.get('input_tokens', 'N/A')}, Output Tokens ${plan.get('output_tokens', 'N/A')}")
-                        print("")
+                        company = plan.get('company_name', 'N/A')
+                        plan_name = plan.get('plan_name', 'N/A')
+                        input_tokens = f"${plan.get('input_tokens', 'N/A')}"
+                        output_tokens = f"${plan.get('output_tokens', 'N/A')}"
+                        print(f"{company:<20} {plan_name:<25} {input_tokens:<15} {output_tokens:<15}")
+
+                    # Close table
+                    print("-" * 75)
                 else:
                     print(type(plans))
                     print(f"  {result_text}")
