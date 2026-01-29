@@ -1,5 +1,6 @@
 import asyncio
 import json
+import ast
 import logging
 import os
 import shutil
@@ -453,9 +454,21 @@ class ChatSession:
             print("=" * 50)
 
             print("\nPricing Plans:")
-            # The result.content is a list with one item, a dict, where the 'text' key holds the rows
-            for plan in pricing.content[0]["text"]:
-                print(f"  • {plan['company_name']}: {plan['plan_name']} - Input Token ${plan['input_tokens']}, Output Tokens ${plan['output_tokens']}")
+
+            # Extract text from CallToolResult
+            if pricing.content and hasattr(pricing.content[0], 'text'):
+                result_text = pricing.content[0].text
+                plans = ast.literal_eval(result_text)
+                if isinstance(plans, list):
+                    for plan in plans:
+                        print(f"  • {plan.get('company_name', 'N/A')}: {plan.get('plan_name', 'N/A')} - Input Token ${plan.get('input_tokens', 'N/A')}, Output Tokens ${plan.get('output_tokens', 'N/A')}")
+                        print("")
+                else:
+                    print(type(plans))
+                    print(f"  {result_text}")
+
+            else:
+                print("  No data found")
 
             print("=" * 50)
 
