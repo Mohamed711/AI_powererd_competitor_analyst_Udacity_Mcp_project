@@ -18,6 +18,8 @@ from mcp.client.stdio import stdio_client
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+CLAUDE_MODEL = "claude-sonnet-4-5-20250929"
+
 class ToolDefinition(TypedDict):
     name: str
     description: str
@@ -235,7 +237,7 @@ class DataExtractor:
         try:
             response = self.anthropic.messages.create(
                 max_tokens=1024,
-                model='claude-sonnet-4-5-20250929',
+                model=CLAUDE_MODEL,
                 messages=[{'role': 'user', 'content': prompt}]
             )
 
@@ -311,7 +313,7 @@ class ChatSession:
 
     def __init__(self, servers: list[Server], api_key: str) -> None:
         self.servers: list[Server] = servers
-        self.anthropic = Anthropic(base_url="https://claude.vocareum.com", api_key=api_key)
+        self.anthropic = Anthropic(api_key=api_key)
         self.available_tools: List[ToolDefinition] = []
         self.tool_to_server: Dict[str, str] = {}
         self.sqlite_server: Server | None = None
@@ -330,7 +332,7 @@ class ChatSession:
         messages = [{'role': 'user', 'content': query}]
         response = self.anthropic.messages.create(
             max_tokens=2024,
-            model="claude-sonnet-4-5-20250929",
+            model=CLAUDE_MODEL,
             tools=self.available_tools,
             messages=messages
         )
@@ -398,7 +400,7 @@ class ChatSession:
                 # Call Claude again with updated messages
                 response = self.anthropic.messages.create(
                     max_tokens=2024,
-                    model="claude-sonnet-4-5-20250929",
+                    model=CLAUDE_MODEL,
                     tools=self.available_tools,
                     messages=messages
                 )
