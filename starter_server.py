@@ -180,15 +180,4 @@ def extract_scraped_info(identifier: str) -> str:
 
 
 if __name__ == "__main__":
-    # result = mcp.call_tool(name="scrape_websites", arguments={"websites":{"claudrift":"https://www.cloudrift.ai/inference"}})
     mcp.run(transport="stdio")
-
-    # For testing: uncomment the lines below and comment out mcp.run() above
-    # result_ = scrape_websites(
-    #     websites={"cloudrift": "https://www.cloudrift.ai/inference"},
-    #     formats=['markdown', 'html']
-    # )
-    # print(f"Scrape result: {result_}")
-    #
-    # info = extract_scraped_info("cloudrift")
-    # print(f"Extracted info: {info}")
