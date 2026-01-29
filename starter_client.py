@@ -235,6 +235,9 @@ class DataExtractor:
     async def _get_structured_extraction(self, prompt: str) -> str:
         """Use Claude to extract structured data."""
         try:
+            # Add delay to prevent rate limiting
+            await asyncio.sleep(4.0)
+
             response = self.anthropic.messages.create(
                 max_tokens=1024,
                 model=CLAUDE_MODEL,
@@ -313,7 +316,7 @@ class ChatSession:
 
     def __init__(self, servers: list[Server], api_key: str) -> None:
         self.servers: list[Server] = servers
-        self.anthropic = Anthropic(api_key=api_key)
+        self.anthropic = Anthropic(api_key=api_key, max_retries=1)
         self.available_tools: List[ToolDefinition] = []
         self.tool_to_server: Dict[str, str] = {}
         self.sqlite_server: Server | None = None
@@ -327,15 +330,43 @@ class ChatSession:
             except Exception as e:
                 logging.warning(f"Warning during final cleanup: {e}")
 
-    async def process_query(self, query: str) -> None:
-        """Process a user query and extract/store relevant data."""
+    async def process_query(self, query: str) -> str:
+        """Process a user query and extract/store relevant data.
+
+        Returns:
+            The final response text from Claude.
+        """
+        # Add system prompt to check database first
+        system_prompt = """You are a helpful assistant that answers questions about LLM pricing.
+
+            IMPORTANT WORKFLOW:
+            1. ALWAYS check the database FIRST using read_query to see if the requested pricing information already exists
+            2. Only scrape websites if the data is NOT in the database
+            3. After scraping, extract and answer the user's question
+
+            Available database schema:
+            - pricing_plans table with columns: company_name, plan_name, input_tokens, output_tokens, currency, billing_period, features, limitations, source_query, created_at
+
+            Example queries to check database:
+            - SELECT * FROM pricing_plans WHERE company_name LIKE '%deepinfra%' OR company_name LIKE '%DeepInfra%'
+            - SELECT * FROM pricing_plans WHERE company_name LIKE '%cloudrift%' OR company_name LIKE '%CloudRift%'
+            - SELECT * FROM pricing_plans WHERE plan_name LIKE '%deepseek%' OR plan_name LIKE '%DeepSeek%'
+
+            Use case-insensitive matching with LIKE and wildcards (%) to find relevant data."""
+
         messages = [{'role': 'user', 'content': query}]
+
+        # Add delay to prevent rate limiting
+        await asyncio.sleep(4.0)
+
         response = self.anthropic.messages.create(
             max_tokens=2024,
             model=CLAUDE_MODEL,
+            system=system_prompt,
             tools=self.available_tools,
             messages=messages
         )
+
 
         full_response = ""
         source_url = None
@@ -369,6 +400,7 @@ class ChatSession:
                         raise ValueError(f"Server '{server_name}' not found for tool '{tool_name}'.")
                     tool_result = await server.execute_tool(tool_name, tool_args)
 
+
                     # Extract content from CallToolResult
                     result_content = []
                     for content_item in tool_result.content:
@@ -397,7 +429,9 @@ class ChatSession:
                     'content': tool_results
                 })
 
-                # Call Claude again with updated messages
+                # Call Claude again with updated messages (with rate limit delay)
+                await asyncio.sleep(4.0)
+
                 response = self.anthropic.messages.create(
                     max_tokens=2024,
                     model=CLAUDE_MODEL,
@@ -410,6 +444,8 @@ class ChatSession:
 
         if self.data_extractor and full_response.strip():
             await self.data_extractor.extract_and_store_data(query, full_response.strip(), source_url)
+
+        return full_response.strip()
 
     def _extract_url_from_result(self, result_text: str) -> str | None:
         """Extract URL from tool result."""
@@ -432,7 +468,9 @@ class ChatSession:
                     await self.show_stored_data()
                     continue
 
-                await self.process_query(query)
+                response = await self.process_query(query)
+                if response:
+                    print(f"\n{response}")
                 print("\n")
 
             except KeyboardInterrupt:
